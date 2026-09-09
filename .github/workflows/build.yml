@@ -1,0 +1,84 @@
+name: Build RU GeoIP
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: "0 3 * * *"
+      timezone: "Europe/Moscow"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.x"
+          cache: false
+
+      - name: Install v2fly geoip
+        run: |
+          go install github.com/v2fly/geoip@latest
+
+      - name: Build RU-only geoip.dat
+        run: |
+          mkdir -p output
+          geoip -c config.json
+
+          test -s output/geoip.dat
+
+          echo "Generated file:"
+          ls -lh output/geoip.dat
+
+          cd output
+          sha256sum geoip.dat > geoip.dat.sha256
+          
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATE=$(TZ=Europe/Moscow date +"%Y-%m-%d")
+          TITLE="RU GeoIP — $DATE"
+
+          if gh release view ru-latest >/dev/null 2>&1; then
+            gh release upload ru-latest \
+              output/geoip.dat \
+              output/geoip.dat.sha256 \
+              --clobber
+
+            gh release edit ru-latest \
+              --title "$TITLE"
+          else
+            gh release create ru-latest \
+              output/geoip.dat \
+              output/geoip.dat.sha256 \
+              --title "$TITLE" \
+              --notes "Automatically generated RU-only geoip.dat from v2fly/geoip."
+          fi
+          
+      - name: Keep repository active
+        run: |
+          LAST_COMMIT=$(git log -1 --format=%ct)
+          NOW=$(date +%s)
+          AGE=$((NOW - LAST_COMMIT))
+
+          if [ "$AGE" -ge 2592000 ]; then
+            date -u +"%Y-%m-%dT%H:%M:%SZ" > last-update.txt
+
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            git add last-update.txt
+            git commit -m "chore: keep scheduled workflow active"
+            git push
+          else
+            echo "Repository is active. No keepalive commit needed."
+          fi
