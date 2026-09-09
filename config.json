@@ -1,0 +1,9 @@
+[
+  {
+    "name": "dlc.dat",
+    "mode": "allowlist",
+    "lists": [
+      "category-ru"
+    ]
+  }
+]
