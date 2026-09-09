@@ -1,6 +1,6 @@
 [
   {
-    "name": "dlc.dat",
+    "name": "geosite.dat",
     "mode": "allowlist",
     "lists": [
       "category-ru"
